@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+mlruns/
+data/raw/*.txt
+data/raw/*.zip
+*.pkl
+*.pem
+.DS_Store
