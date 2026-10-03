@@ -1,5 +1,6 @@
 import mlflow
 import mlflow.sklearn
+import mlflow.xgboost
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import train_test_split
@@ -30,7 +31,11 @@ def train(data_dir: str = "data/raw", subset: str = "FD001"):
         iso = IsolationForest(contamination=0.1, random_state=42, n_jobs=-1)
         iso.fit(X_train)
         mlflow.log_param("contamination", 0.1)
-        mlflow.sklearn.log_model(iso, "isolation-forest", registered_model_name="anomaly-detector")
+        mlflow.sklearn.log_model(
+            iso, "isolation-forest",
+            registered_model_name="anomaly-detector",
+            skops_trusted_types=["sklearn.tree._tree.Tree", "sklearn.ensemble._iforest.IsolationForest"],
+        )
         print("  Isolation Forest logged.")
 
     # --- Failure Prediction ---
@@ -54,7 +59,10 @@ def train(data_dir: str = "data/raw", subset: str = "FD001"):
         mlflow.log_param("n_estimators", 200)
         mlflow.log_param("max_depth", 6)
         mlflow.log_metric("roc_auc", round(auc, 4))
-        mlflow.sklearn.log_model(clf, "xgboost-failure", registered_model_name="failure-predictor")
+        mlflow.xgboost.log_model(
+            clf, "xgboost-failure",
+            registered_model_name="failure-predictor",
+        )
 
         print(f"  ROC-AUC: {auc:.4f}")
         print(classification_report(yf_test, preds))
@@ -73,7 +81,10 @@ def train(data_dir: str = "data/raw", subset: str = "FD001"):
         mlflow.log_metric("mae", round(mae, 2))
         mlflow.log_metric("rmse", round(rmse, 2))
         mlflow.log_metric("r2", round(r2, 4))
-        mlflow.sklearn.log_model(reg, "xgboost-rul", registered_model_name="rul-predictor")
+        mlflow.xgboost.log_model(
+            reg, "xgboost-rul",
+            registered_model_name="rul-predictor",
+        )
 
         print(f"  MAE: {mae:.2f} | RMSE: {rmse:.2f} | R²: {r2:.4f}")
 

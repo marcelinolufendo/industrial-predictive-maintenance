@@ -5,8 +5,9 @@ __pycache__/
 .venv/
 venv/
 mlruns/
-data/raw/*.txt
-data/raw/*.zip
+mlflow.db
+data/raw/
+CMaps/
 *.pkl
 *.pem
 .DS_Store

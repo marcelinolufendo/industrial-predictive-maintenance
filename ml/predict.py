@@ -1,4 +1,6 @@
+import mlflow
 import mlflow.sklearn
+import mlflow.xgboost
 import numpy as np
 import pandas as pd
 from ml.features import get_feature_columns
@@ -7,8 +9,8 @@ from ml.features import get_feature_columns
 def load_models(tracking_uri: str = "./mlruns"):
     mlflow.set_tracking_uri(tracking_uri)
     anomaly_model = mlflow.sklearn.load_model("models:/anomaly-detector/latest")
-    failure_model = mlflow.sklearn.load_model("models:/failure-predictor/latest")
-    rul_model = mlflow.sklearn.load_model("models:/rul-predictor/latest")
+    failure_model = mlflow.xgboost.load_model("models:/failure-predictor/latest")
+    rul_model = mlflow.xgboost.load_model("models:/rul-predictor/latest")
     return anomaly_model, failure_model, rul_model
 
 
@@ -27,6 +29,3 @@ def predict(features: dict, anomaly_model, failure_model, rul_model) -> dict:
         "failure_probability": round(failure_probability, 4),
         "rul": rul,
     }
-
-
-import mlflow
