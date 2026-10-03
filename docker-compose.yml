@@ -1,0 +1,129 @@
+services:
+
+  # ── Kafka (KRaft mode — sem Zookeeper) ──────────────────────────────────────
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_LOG_RETENTION_HOURS=24
+    volumes:
+      - kafka_data:/bitnami/kafka
+    networks:
+      - predictive-net
+    healthcheck:
+      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── Kafka UI ─────────────────────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - predictive-net
+
+  # ── Spark Master ─────────────────────────────────────────────────────────────
+  spark-master:
+    image: bitnami/spark:3.5
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_MASTER_OPTS=-Dspark.deploy.defaultCores=2
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+    volumes:
+      - ./data:/opt/spark/data
+      - ./streaming:/opt/spark/jobs
+      - spark_checkpoints:/opt/spark/checkpoints
+      - delta_lake:/opt/spark/delta
+    networks:
+      - predictive-net
+
+  # ── Spark Worker ─────────────────────────────────────────────────────────────
+  spark-worker:
+    image: bitnami/spark:3.5
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=3
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+    depends_on:
+      - spark-master
+    volumes:
+      - ./data:/opt/spark/data
+      - ./streaming:/opt/spark/jobs
+      - spark_checkpoints:/opt/spark/checkpoints
+      - delta_lake:/opt/spark/delta
+    networks:
+      - predictive-net
+
+  # ── MLflow ───────────────────────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.15.1
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    volumes:
+      - mlflow_data:/mlflow
+    networks:
+      - predictive-net
+
+  # ── FastAPI ──────────────────────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MODEL_NAME=failure-predictor
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    depends_on:
+      - mlflow
+    volumes:
+      - ./data:/app/data
+    networks:
+      - predictive-net
+
+volumes:
+  kafka_data:
+  spark_checkpoints:
+  delta_lake:
+  mlflow_data:
+
+networks:
+  predictive-net:
+    driver: bridge
