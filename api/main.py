@@ -1,8 +1,10 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 
 from api.schemas import PredictionOutput, SensorInput, StreamingPrediction
 from decision_engine.engine import decide
@@ -57,6 +59,37 @@ def predict_endpoint(payload: SensorInput):
     )
 
 
+@app.get("/machines", response_model=list[StreamingPrediction])
+def all_machines():
+    delta_base = os.getenv("DELTA_BASE", "/opt/spark/delta")
+    gold_path = f"{delta_base}/gold"
+    try:
+        from deltalake import DeltaTable
+        dt = DeltaTable(gold_path)
+        df = dt.to_pandas()
+    except Exception:
+        return []
+
+    latest = (
+        df.sort_values("predicted_at")
+        .groupby("machine_id")
+        .last()
+        .reset_index()
+    )
+    return [
+        StreamingPrediction(
+            machine_id=str(r["machine_id"]),
+            cycle=int(r["cycle"]),
+            anomaly_score=float(r["anomaly_score"]),
+            failure_probability=float(r["failure_probability"]),
+            rul=float(r["rul"]),
+            status=str(r["status"]),
+            predicted_at=str(r["predicted_at"]),
+        )
+        for _, r in latest.iterrows()
+    ]
+
+
 @app.get("/machines/{machine_id}/latest", response_model=StreamingPrediction)
 def latest_prediction(machine_id: str):
     delta_base = os.getenv("DELTA_BASE", "/opt/spark/delta")
@@ -82,3 +115,9 @@ def latest_prediction(machine_id: str):
         status=str(row["status"]),
         predicted_at=str(row["predicted_at"]),
     )
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard():
+    html = Path(__file__).parent / "dashboard.html"
+    return HTMLResponse(content=html.read_text())

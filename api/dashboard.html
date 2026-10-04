@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Predictive Maintenance Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --border: #2a2d3e;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --normal: #22c55e;
+      --warning: #f59e0b;
+      --critical: #ef4444;
+      --accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: 0.02em; }
+    #refresh-status { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--normal);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    #summary {
+      display: flex; gap: 16px;
+      padding: 20px 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 24px;
+      min-width: 140px;
+      flex: 1;
+    }
+    .stat-card .label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-card .value { font-size: 2rem; font-weight: 700; margin-top: 4px; }
+    .value.normal { color: var(--normal); }
+    .value.warning { color: var(--warning); }
+    .value.critical { color: var(--critical); }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      padding: 0 24px 24px;
+    }
+    .machine-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      border-left: 4px solid var(--border);
+      transition: border-color 0.3s;
+    }
+    .machine-card.NORMAL  { border-left-color: var(--normal); }
+    .machine-card.WARNING  { border-left-color: var(--warning); }
+    .machine-card.CRITICAL { border-left-color: var(--critical); }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .card-header h3 { font-size: 1rem; font-weight: 600; }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+    }
+    .badge.NORMAL  { background: #16532810; color: var(--normal); border: 1px solid var(--normal); }
+    .badge.WARNING  { background: #78350010; color: var(--warning); border: 1px solid var(--warning); }
+    .badge.CRITICAL { background: #7f1d1d10; color: var(--critical); border: 1px solid var(--critical); }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .metric { text-align: center; }
+    .metric .m-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; }
+    .metric .m-value { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
+    .bar-row { margin-bottom: 6px; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; }
+    .bar-track { background: var(--border); border-radius: 4px; height: 5px; }
+    .bar-fill { height: 5px; border-radius: 4px; transition: width 0.4s; }
+    .card-footer { font-size: 0.68rem; color: var(--text-muted); margin-top: 10px; }
+    #empty {
+      grid-column: 1/-1;
+      text-align: center;
+      padding: 60px;
+      color: var(--text-muted);
+    }
+    #empty p { font-size: 1rem; margin-top: 8px; }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ Predictive Maintenance</h1>
+    <div id="refresh-status">
+      <span class="dot"></span>
+      <span id="last-update">Loading…</span>
+    </div>
+  </header>
+
+  <div id="summary">
+    <div class="stat-card"><div class="label">Machines</div><div class="value" id="total">—</div></div>
+    <div class="stat-card"><div class="label">Normal</div><div class="value normal" id="cnt-normal">—</div></div>
+    <div class="stat-card"><div class="label">Warning</div><div class="value warning" id="cnt-warning">—</div></div>
+    <div class="stat-card"><div class="label">Critical</div><div class="value critical" id="cnt-critical">—</div></div>
+    <div class="stat-card"><div class="label">Avg RUL</div><div class="value" id="avg-rul">—</div></div>
+  </div>
+
+  <div id="grid">
+    <div id="empty"><div class="spinner"></div><p>Connecting to pipeline…</p></div>
+  </div>
+
+  <script>
+    function statusColor(s) {
+      if (s === 'CRITICAL') return 'var(--critical)';
+      if (s === 'WARNING')  return 'var(--warning)';
+      return 'var(--normal)';
+    }
+    function rulColor(rul) {
+      if (rul <= 20) return 'var(--critical)';
+      if (rul <= 50) return 'var(--warning)';
+      return 'var(--normal)';
+    }
+    function barColor(val, thresholds) {
+      if (val >= thresholds[1]) return 'var(--critical)';
+      if (val >= thresholds[0]) return 'var(--warning)';
+      return 'var(--normal)';
+    }
+    function fmt(v, d=2) { return typeof v === 'number' ? v.toFixed(d) : '—'; }
+    function timeAgo(isoStr) {
+      const d = new Date(isoStr);
+      if (isNaN(d)) return isoStr;
+      const sec = Math.round((Date.now() - d) / 1000);
+      if (sec < 60) return `${sec}s ago`;
+      if (sec < 3600) return `${Math.round(sec/60)}m ago`;
+      return `${Math.round(sec/3600)}h ago`;
+    }
+
+    function renderCard(m) {
+      const anomPct = Math.min(100, m.anomaly_score * 100);
+      const failPct = Math.min(100, m.failure_probability * 100);
+      const rulPct  = Math.min(100, (m.rul / 150) * 100);
+      return `
+        <div class="machine-card ${m.status}">
+          <div class="card-header">
+            <h3>Machine ${m.machine_id}</h3>
+            <span class="badge ${m.status}">${m.status}</span>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <div class="m-label">Anomaly</div>
+              <div class="m-value" style="color:${barColor(m.anomaly_score,[0.6,0.8])}">${fmt(m.anomaly_score)}</div>
+            </div>
+            <div class="metric">
+              <div class="m-label">Failure %</div>
+              <div class="m-value" style="color:${barColor(m.failure_probability,[0.4,0.7])}">${fmt(m.failure_probability * 100, 1)}%</div>
+            </div>
+            <div class="metric">
+              <div class="m-label">RUL</div>
+              <div class="m-value" style="color:${rulColor(m.rul)}">${Math.round(m.rul)}</div>
+            </div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>Anomaly score</span><span>${fmt(m.anomaly_score)}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${anomPct}%;background:${barColor(m.anomaly_score,[0.6,0.8])}"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>Failure probability</span><span>${fmt(m.failure_probability * 100, 1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${failPct}%;background:${barColor(m.failure_probability,[0.4,0.7])}"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>RUL (cycle ${m.cycle})</span><span>${Math.round(m.rul)} cycles</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${rulPct}%;background:${rulColor(m.rul)}"></div></div>
+          </div>
+          <div class="card-footer">Updated ${timeAgo(m.predicted_at)}</div>
+        </div>`;
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch('/machines');
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        const grid = document.getElementById('grid');
+
+        if (!data.length) {
+          grid.innerHTML = '<div id="empty"><div class="spinner"></div><p>Waiting for streaming data from Spark…</p></div>';
+          document.getElementById('last-update').textContent = 'No data yet';
+          ['total','cnt-normal','cnt-warning','cnt-critical','avg-rul'].forEach(id => {
+            document.getElementById(id).textContent = '—';
+          });
+          return;
+        }
+
+        const normal   = data.filter(m => m.status === 'NORMAL').length;
+        const warning  = data.filter(m => m.status === 'WARNING').length;
+        const critical = data.filter(m => m.status === 'CRITICAL').length;
+        const avgRul   = data.reduce((s, m) => s + m.rul, 0) / data.length;
+
+        document.getElementById('total').textContent      = data.length;
+        document.getElementById('cnt-normal').textContent  = normal;
+        document.getElementById('cnt-warning').textContent = warning;
+        document.getElementById('cnt-critical').textContent= critical;
+        document.getElementById('avg-rul').textContent     = Math.round(avgRul);
+
+        const sorted = [...data].sort((a, b) => {
+          const order = { CRITICAL: 0, WARNING: 1, NORMAL: 2 };
+          return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+        });
+        grid.innerHTML = sorted.map(renderCard).join('');
+        document.getElementById('last-update').textContent =
+          'Last update: ' + new Date().toLocaleTimeString();
+      } catch (err) {
+        document.getElementById('last-update').textContent = 'Error: ' + err.message;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>
