@@ -108,10 +108,10 @@ services:
       - coolify
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`${COOLIFY_FQDN}`)"
-      - "traefik.http.routers.api.entrypoints=http"
-      - "traefik.http.services.api.loadbalancer.server.port=8000"
-      - "traefik.http.routers.api.service=api"
+      - "traefik.http.routers.api-predictive.rule=Host(`3o9bqyabjplefuacz5tvrlnp.37.60.244.164.sslip.io`)"
+      - "traefik.http.routers.api-predictive.entrypoints=http"
+      - "traefik.http.services.api-predictive.loadbalancer.server.port=8000"
+      - "traefik.http.routers.api-predictive.service=api-predictive"
 
 volumes:
   kafka_data:
