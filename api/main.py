@@ -16,11 +16,14 @@ models = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
-    anomaly, failure, rul = load_models(tracking_uri)
-    models["anomaly"] = anomaly
-    models["failure"] = failure
-    models["rul"] = rul
-    print("Models loaded.")
+    try:
+        anomaly, failure, rul = load_models(tracking_uri)
+        models["anomaly"] = anomaly
+        models["failure"] = failure
+        models["rul"] = rul
+        print("Models loaded.")
+    except Exception as e:
+        print(f"Warning: models not loaded — {e}")
     yield
     models.clear()
 
