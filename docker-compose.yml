@@ -2,7 +2,7 @@ services:
 
   # ── Kafka (KRaft mode — sem Zookeeper) ──────────────────────────────────────
   kafka:
-    image: bitnami/kafka:3.7
+    image: bitnami/kafka:3.9
     container_name: kafka
     ports:
       - "9092:9092"
@@ -44,7 +44,7 @@ services:
 
   # ── Spark Master ─────────────────────────────────────────────────────────────
   spark-master:
-    image: bitnami/spark:3.5
+    image: bitnami/spark:3.5.3
     container_name: spark-master
     environment:
       - SPARK_MODE=master
@@ -64,7 +64,7 @@ services:
 
   # ── Spark Worker ─────────────────────────────────────────────────────────────
   spark-worker:
-    image: bitnami/spark:3.5
+    image: bitnami/spark:3.5.3
     container_name: spark-worker
     environment:
       - SPARK_MODE=worker
