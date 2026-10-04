@@ -77,7 +77,7 @@ services:
 
   # ── MLflow ───────────────────────────────────────────────────────────────────
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.15.1
+    image: ghcr.io/mlflow/mlflow:latest
     container_name: mlflow
     command: >
       mlflow server
