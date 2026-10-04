@@ -23,7 +23,7 @@ try:
 except Exception:
     print("No models found. Starting training (this takes ~2 minutes)...")
     import subprocess
-    result = subprocess.run([sys.executable, "ml/train.py"], check=True)
+    result = subprocess.run([sys.executable, "-m", "ml.train"], check=True)
     print("Training complete.")
 EOF
 
