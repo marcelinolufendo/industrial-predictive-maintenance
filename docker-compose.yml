@@ -90,6 +90,29 @@ services:
     networks:
       - predictive-net
 
+  # ── Spark Streaming Job ──────────────────────────────────────────────────────
+  streaming:
+    build:
+      context: ./streaming
+      dockerfile: Dockerfile
+    container_name: streaming
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: sensor-readings
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DELTA_BASE: /opt/spark/delta
+      CHECKPOINT_BASE: /opt/spark/checkpoints
+    depends_on:
+      - kafka
+      - spark-master
+      - mlflow
+    volumes:
+      - spark_checkpoints:/opt/spark/checkpoints
+      - delta_lake:/opt/spark/delta
+    networks:
+      - predictive-net
+    restart: on-failure
+
   # ── FastAPI ──────────────────────────────────────────────────────────────────
   api:
     build: .
