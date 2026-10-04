@@ -6,7 +6,8 @@ __pycache__/
 venv/
 mlruns/
 mlflow.db
-data/raw/
+data/raw/*
+!data/raw/train_FD001.txt
 CMaps/
 *.pkl
 *.pem
