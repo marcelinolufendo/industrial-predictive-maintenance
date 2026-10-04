@@ -1,49 +1,63 @@
+import json
+import os
 import time
-import requests
-import pandas as pd
-import numpy as np
 from pathlib import Path
 
-from ml.loader import load_cmapss, add_rul, COLUMNS, SENSORS
-from ml.features import add_rolling_features, get_feature_columns
+import pandas as pd
+from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
 
-API_URL = "http://localhost:8000/predict"
+from ml.loader import load_cmapss, add_rul, COLUMNS, SENSORS
+
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+TOPIC = os.getenv("KAFKA_TOPIC", "sensor-readings")
+
+
+def make_producer(retries: int = 10, delay: int = 5) -> KafkaProducer:
+    for attempt in range(retries):
+        try:
+            return KafkaProducer(
+                bootstrap_servers=KAFKA_BOOTSTRAP,
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                key_serializer=lambda k: k.encode("utf-8"),
+            )
+        except NoBrokersAvailable:
+            print(f"Kafka not ready, retrying in {delay}s... ({attempt + 1}/{retries})")
+            time.sleep(delay)
+    raise RuntimeError(f"Could not connect to Kafka at {KAFKA_BOOTSTRAP}")
 
 
 def simulate(data_dir: str = "data/raw", subset: str = "FD001", speed: float = 0.5, machine_filter: int = None):
     path = Path(data_dir) / f"train_{subset}.txt"
     df = pd.read_csv(str(path), sep=r"\s+", header=None, names=COLUMNS)
     df = add_rul(df)
-    df = add_rolling_features(df)
 
     if machine_filter:
         df = df[df["machine_id"] == machine_filter]
 
-    feature_cols = get_feature_columns()
+    producer = make_producer()
+    print(f"Connected to Kafka at {KAFKA_BOOTSTRAP}")
+    print(f"Publishing to topic: {TOPIC}")
     print(f"Simulating {df['machine_id'].nunique()} machines | {len(df)} events\n")
 
     for _, row in df.iterrows():
-        payload = {"machine_id": f"M{int(row['machine_id']):03d}"}
-        payload.update({col: float(row[col]) if col in row.index else 0.0 for col in feature_cols})
-        payload["cycle"] = float(row["cycle"])
-        payload["op1"] = float(row["op1"])
-        payload["op2"] = float(row["op2"])
-        payload["op3"] = float(row["op3"])
+        machine_id = f"M{int(row['machine_id']):03d}"
+        message = {
+            "machine_id": machine_id,
+            "cycle": int(row["cycle"]),
+            "op1": float(row["op1"]),
+            "op2": float(row["op2"]),
+            "op3": float(row["op3"]),
+            **{s: float(row[s]) for s in SENSORS},
+            "timestamp": int(time.time() * 1000),
+        }
 
-        try:
-            resp = requests.post(API_URL, json=payload, timeout=5)
-            result = resp.json()
-            status = result.get("status", "?")
-            fp = result.get("failure_probability", 0)
-            rul = result.get("rul", "?")
-            print(
-                f"Machine {result['machine_id']} | Cycle {int(row['cycle']):4d} | "
-                f"Status: {status:8s} | Failure Prob: {fp:.2%} | RUL: {rul}"
-            )
-        except Exception as e:
-            print(f"Error: {e}")
-
+        producer.send(TOPIC, key=machine_id, value=message)
+        print(f"Machine {machine_id} | Cycle {int(row['cycle']):4d} → published")
         time.sleep(speed)
+
+    producer.flush()
+    print("\nSimulation complete.")
 
 
 if __name__ == "__main__":
