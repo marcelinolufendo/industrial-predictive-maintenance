@@ -5,7 +5,8 @@ __pycache__/
 .env
 mlruns/
 mlflow.db
-data/raw/
+data/raw/*
+!data/raw/train_FD001.txt
 CMaps/
 *.pem
 .git/
