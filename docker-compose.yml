@@ -32,8 +32,6 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
-    ports:
-      - "8082:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -48,7 +46,6 @@ services:
     container_name: spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     ports:
-      - "8091:8080"
       - "7077:7077"
     environment:
       SPARK_MASTER_HOST: spark-master
@@ -82,8 +79,6 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.15.1
     container_name: mlflow
-    ports:
-      - "5000:5000"
     command: >
       mlflow server
       --backend-store-uri sqlite:///mlflow/mlflow.db
@@ -99,8 +94,6 @@ services:
   api:
     build: .
     container_name: api
-    ports:
-      - "3000:8000"
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_NAME: failure-predictor
@@ -112,6 +105,13 @@ services:
       - ./data:/app/data
     networks:
       - predictive-net
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`${COOLIFY_FQDN}`)"
+      - "traefik.http.routers.api.entrypoints=http"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.api.service=api"
 
 volumes:
   kafka_data:
@@ -122,3 +122,5 @@ volumes:
 networks:
   predictive-net:
     driver: bridge
+  coolify:
+    external: true
