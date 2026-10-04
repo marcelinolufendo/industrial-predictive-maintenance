@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
-from api.schemas import PredictionOutput, SensorInput
+from api.schemas import PredictionOutput, SensorInput, StreamingPrediction
 from decision_engine.engine import decide
 from ml.predict import load_models, predict
 
@@ -57,6 +57,28 @@ def predict_endpoint(payload: SensorInput):
     )
 
 
-@app.get("/machines/{machine_id}/health")
-def machine_health(machine_id: str):
-    return {"machine_id": machine_id, "message": "Use POST /predict with sensor data"}
+@app.get("/machines/{machine_id}/latest", response_model=StreamingPrediction)
+def latest_prediction(machine_id: str):
+    delta_base = os.getenv("DELTA_BASE", "/opt/spark/delta")
+    gold_path = f"{delta_base}/gold"
+    try:
+        from deltalake import DeltaTable
+        dt = DeltaTable(gold_path)
+        df = dt.to_pandas()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Gold table not available: {e}")
+
+    machine_df = df[df["machine_id"] == machine_id]
+    if machine_df.empty:
+        raise HTTPException(status_code=404, detail=f"No predictions found for {machine_id}")
+
+    row = machine_df.sort_values("predicted_at").iloc[-1]
+    return StreamingPrediction(
+        machine_id=str(row["machine_id"]),
+        cycle=int(row["cycle"]),
+        anomaly_score=float(row["anomaly_score"]),
+        failure_probability=float(row["failure_probability"]),
+        rul=float(row["rul"]),
+        status=str(row["status"]),
+        predicted_at=str(row["predicted_at"]),
+    )

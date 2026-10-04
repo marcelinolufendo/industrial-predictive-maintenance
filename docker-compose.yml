@@ -122,8 +122,11 @@ services:
       MODEL_NAME: failure-predictor
       API_HOST: 0.0.0.0
       API_PORT: 8000
+      DELTA_BASE: /opt/spark/delta
     depends_on:
       - mlflow
+    volumes:
+      - delta_lake:/opt/spark/delta
     networks:
       - predictive-net
       - coolify

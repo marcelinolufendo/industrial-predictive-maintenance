@@ -72,3 +72,14 @@ class PredictionOutput(BaseModel):
     rul: int
     status: str
     reasons: list[str]
+
+
+class StreamingPrediction(BaseModel):
+    machine_id: str
+    cycle: int
+    anomaly_score: float
+    failure_probability: float
+    rul: float
+    status: str
+    predicted_at: str
+    source: str = "streaming"
