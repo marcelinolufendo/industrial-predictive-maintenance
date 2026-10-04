@@ -48,7 +48,7 @@ services:
     container_name: spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     ports:
-      - "8081:8080"
+      - "8091:8080"
       - "7077:7077"
     environment:
       SPARK_MASTER_HOST: spark-master
@@ -100,7 +100,7 @@ services:
     build: .
     container_name: api
     ports:
-      - "8000:8000"
+      - "3000:8000"
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_NAME: failure-predictor
