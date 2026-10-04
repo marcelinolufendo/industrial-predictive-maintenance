@@ -101,8 +101,6 @@ services:
       API_PORT: 8000
     depends_on:
       - mlflow
-    volumes:
-      - ./data:/app/data
     networks:
       - predictive-net
       - coolify
